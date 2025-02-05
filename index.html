@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Discord Time Display</title>
+    <script src="https://unpkg.com/@discord/embedded-app-sdk@1"></script>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background: #36393f;
+            color: white;
+            font-family: Arial, sans-serif;
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            overflow: hidden;
+        }
+        .container {
+            background: #2f3136;
+            padding: 2rem;
+            border-radius: 8px;
+            text-align: center;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+            max-width: 90%;
+            width: 500px;
+        }
+        #time {
+            font-size: 4rem;
+            color: #7289da;
+            margin: 1rem 0;
+        }
+        #status {
+            color: #43b581;
+            margin-top: 1rem;
+        }
+        #debug {
+            color: #999;
+            font-size: 0.8rem;
+            margin-top: 1rem;
+            text-align: left;
+            max-height: 150px;
+            overflow-y: auto;
+            border-top: 1px solid #40444b;
+            padding-top: 1rem;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+        .error {
+            color: #f04747;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Discord Time Display</h1>
+        <div id="time">Loading...</div>
+        <div id="status">Initializing...</div>
+        <div id="debug"></div>
+    </div>
+
+    <script>
+        const APPLICATION_ID = '1336526920464072847';
+        
+        // Debug logging helper
+        const debug = (msg, data = null) => {
+            console.log(msg, data);
+            const debugEl = document.getElementById('debug');
+            const timestamp = new Date().toISOString();
+            let logMessage = `[${timestamp}] ${msg}`;
+            if (data) {
+                logMessage += `\n${JSON.stringify(data, null, 2)}`;
+            }
+            debugEl.innerHTML = `<div>${logMessage}</div>` + debugEl.innerHTML;
+        };
+
+        // Update time display
+        const updateTime = () => {
+            const time = new Date().toLocaleTimeString();
+            document.getElementById('time').textContent = time;
+        };
+
+        // Initialize Discord SDK
+        async function initializeDiscordSDK() {
+            const status = document.getElementById('status');
+            try {
+                debug('Initializing Discord SDK...');
+                
+                // Create SDK instance
+                const sdk = await Discord.initEmbeddedApp({
+                    clientId: APPLICATION_ID
+                });
+                
+                debug('SDK instance created, waiting for ready...');
+                
+                // Wait for the SDK to be ready
+                await sdk.commands.ready();
+                debug('SDK ready received');
+                
+                // Request authorization
+                try {
+                    const auth = await sdk.commands.authorize({
+                        client_id: APPLICATION_ID,
+                        response_type: 'code',
+                        state: '',
+                        prompt: 'none',
+                        scope: ['identify']
+                    });
+                    debug('Authorization successful', auth);
+                    
+                    // Authenticate with the received code
+                    if (auth.code) {
+                        const authenticated = await sdk.commands.authenticate({
+                            access_token: auth.code
+                        });
+                        debug('Authentication successful', authenticated);
+                    }
+                } catch (authError) {
+                    debug('Authorization skipped - this is normal for initial setup', authError);
+                }
+                
+                status.textContent = 'Connected to Discord';
+                status.style.color = '#43b581';
+                debug('Discord SDK fully initialized');
+                
+            } catch (error) {
+                debug('Error initializing Discord SDK:', error);
+                status.textContent = 'Failed to connect to Discord';
+                status.className = 'error';
+                throw error;
+            }
+        }
+
+        // Start everything up
+        async function initialize() {
+            try {
+                // Start time updates
+                updateTime();
+                setInterval(updateTime, 1000);
+                
+                // Initialize Discord integration
+                await initializeDiscordSDK();
+                
+            } catch (error) {
+                debug('Initialization error:', error);
+            }
+        }
+
+        // Start when page loads
+        window.onload = initialize;
+    </script>
+</body>
+</html> 
